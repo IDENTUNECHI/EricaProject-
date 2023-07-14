@@ -6,7 +6,6 @@ pygame.camera.init()
 
 WIDTH, HEIGHT = 600 / 2 * 3, 400 / 2 * 3
 WIN = pygame.display.set_mode((WIDTH, HEIGHT), pygame.DOUBLEBUF, 32)
-CAMEAR = pygame.camera.Camera
 
 WHITE = (255, 255, 255)
 
