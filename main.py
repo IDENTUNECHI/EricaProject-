@@ -1,8 +1,7 @@
-import pygame, os, random
+import pygame, os, random, math
 
 #constants
 pygame.init()
-pygame.camera.init()
 
 WIDTH, HEIGHT = 600 / 2 * 3, 400 / 2 * 3
 WIN = pygame.display.set_mode((WIDTH, HEIGHT), pygame.DOUBLEBUF, 32)
@@ -15,14 +14,53 @@ MS = 60
 def load_image(name):
     return pygame.image.load(os.path.join('assets', name)).convert_alpha()
 
+#assets
+image_player = []
+for i in range(6):
+    image_player.append(load_image('player' + str(i + 1) + '.png'))
+
+image_bricks = []
+for i in range(2):
+    image_bricks.append(load_image('brick' + str(i + 1) + '.png'))
+
+image_background_bricks = []
+for i in range(2):
+    image_background_bricks.append(load_image('background_brick' + str(i + 1) + '.png'))
+
 # mathf
 class Vector:
     def __init__(self, x, y):
         self.x = x
         self.y = y
+        self.z = 1
 
     def dist(self, v):
-        return ((v.x - self.x) ** 2 + (v.y - self.y) ** 2)
+        return math.sqrt(((v.x - self.x) ** 2 + (v.y - self.y) ** 2))
+
+#camera
+class Camera:
+    position = Vector(WIDTH/2, HEIGHT/2)
+    position.z = 1
+    rotation = 0
+
+def calculate_render_position(v):
+    _dist = v.dist(Camera.position)
+
+    _rot = math.atan2(Camera.position.y - v.y, Camera.position.x - v.x) + (Camera.rotation / 180 * math.pi)
+
+    _z_dist = _dist * Camera.position.z
+
+    result = Vector(0, 0)
+
+    result.x = (-math.cos(_rot) * _z_dist) + WIDTH/2
+    result.y = (-math.sin(_rot) * _z_dist) + HEIGHT/2
+
+    return result
+
+def calculate_render_scale(w, h):
+    render_width, render_height = math.ceil(w * Camera.position.z + 0.01), math.ceil(h * Camera.position.z + 0.01)
+
+    return (render_width, render_height)
 
 #gameobject
 class GameObject:
@@ -34,6 +72,10 @@ class GameObject:
         self.flip_x = False
         self.flip_y = False
 
+        self.render_position = Vector(0, 0)
+        self.render_width = 0
+        self.render_height = 0
+
     def tick(self):
         pass
         
@@ -41,20 +83,21 @@ class GameObject:
         if self.image == None:
             return
         
-        self.image = pygame.transform.scale(self.image, (self.width, self.height))
+        self.render_position = calculate_render_position(self.position)
+        _scale = calculate_render_scale(self.width, self.height)
+        self.render_width, self.render_height = _scale[0], _scale[1]
+
+        self.image = pygame.transform.scale(self.image, (self.render_width, self.render_height))
         self.image = pygame.transform.flip(self.image, self.flip_x, self.flip_y)
 
-        WIN.blit(self.image, (self.position.x - self.width / 2, self.position.y - self.height / 2))
+        WIN.blit(self.image, (self.render_position.x - self.render_width / 2, self.render_position.y - self.render_height / 2))
    
 #player
 class Player(GameObject):
 
     def __init__(self, x, y):
         super().__init__(x, y)
-        self.images = []
-
-        for i in range(6):
-            self.images.append(load_image('player' + str(i + 1) + '.png'))
+        self.images = image_player
 
         self.gv = 0
         self.xv = 0
@@ -141,18 +184,16 @@ class Player(GameObject):
 class Brick(GameObject):
 
     def __init__(self, x, y):
-        super().__init__(x, y)
-        
-        self.image = load_image('brick' + str(random.randrange(1, 4)) + '.png')
-        self.crop = (0, 0, MS // 3, MS)
+        super().__init__(x, y) 
+        self.images = image_bricks
+        self.image = self.images[random.randrange(0, 2)]
 
 class BackgroundBrick(GameObject):
 
     def __init__(self, x, y):
         super().__init__(x, y)
-
-        self.image = load_image('background_brick' + str(random.randrange(1, 3)) + '.png')
-        print('background_brick' + str(random.randrange(1, 3)) + '.png')
+        self.images = image_background_bricks
+        self.image = self.images[random.randrange(0, 2)]
 
 #objects
 obj_player = Player(0, 200)
@@ -165,14 +206,15 @@ def init():
         if i == 5:
             bricks.append(Brick(i * MS, HEIGHT - MS / 3 * 2 - MS))
 
-
-
     for i in range(40):
         for j in range(30):
             background_bricks.append(BackgroundBrick(i * MS, j * MS))
 
 def tick():
     obj_player.tick()
+
+    Camera.position.x = (obj_player.position.x - Camera.position.x) / 10 + WIDTH/2
+    Camera.position.y = (obj_player.position.y - Camera.position.y) / 10 + HEIGHT/2
 
 def render():
     WIN.fill(WHITE)
